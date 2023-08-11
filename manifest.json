@@ -11,8 +11,8 @@
 
   "content_scripts": [
     {
-      "matches": ["*://*.mozilla.org/*"],
-      "js": ["research.js"]
+      "matches": ["http://*", "https://*"],
+      "js": ["re_search.js"]
     }
   ]
 }
