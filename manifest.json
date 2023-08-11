@@ -1,0 +1,18 @@
+{
+  "manifest_version": 1,
+  "name": "Re-search",
+  "version": "1.0",
+
+  "description": "Allows regex search functionality on all webpages.",
+
+  "icons": {
+    "48": "icon48.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.mozilla.org/*"],
+      "js": ["research.js"]
+    }
+  ]
+}
