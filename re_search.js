@@ -120,7 +120,17 @@ class HighlightReplacement {
     }
     /** Swaps the Text node with the wrapper it is meant to replace. */
     Swap() {
-        this.swap.parentElement.replaceChild(this.wrapper, this.swap);
+        if (this.swap)
+            this.swap.parentElement.replaceChild(this.wrapper, this.swap);
+    }
+    /** Changes the highlight color scheme. */
+    ChangeColor(colorObj = DefaultHighlightOptions) {
+        for (let el of this.wrapper.children) {
+            if (el.className == MATCH_CLASS) {
+                el.style.color = colorObj.color;
+                el.style.backgroundColor = colorObj.backgroundColor
+            }
+        }
     }
 }
 /**
@@ -139,20 +149,20 @@ class Searcher {
         console.log(`Processed ${this.TextNodes.length} Text node(s)`);
         
     }
-    updateRoot(newRoot) {
+    UpdateRoot(newRoot) {
         this.RootNode = newRoot;
     }
     /**
      * Call this if text on the DOM has changed.
      */
-    update() {
-        this.revert();
+    Update() {
+        this.Revert();
         this.TextNodes = AggregateTextNodes(this.RootNode);
     }
     /**
      * Call to restore the original document.
      */
-    revert() {
+    Revert() {
         for (let swapped of this.ReplacedText) {
             swapped.Unswap();
         }
@@ -162,32 +172,35 @@ class Searcher {
      * Carry out a search of all strings within {@link TextNodes} and highlight matched text in the DOM.
      * @param {string} searchstr 
      */
-    search(searchstr, multiFlag = true, caseFlag = false) {
+    Search(searchstr, multiFlag = true, caseFlag = false) {
         debugger;
-        if (this.ReplacedText.length > 1) this.revert();
+        if (this.ReplacedText.length > 1) this.Revert();
         if (searchstr.length === 0) return;
-
-        console.log(`Executing search with string ${searchstr}`);
 
         let flags = "g";
         if (multiFlag) flags += "m";
         if (caseFlag) flags += "i"
-        
-        let re = new RegExp(searchstr, flags);
+        let searchExpression = new RegExp(searchstr, flags);
+
         for (let tnode of this.TextNodes) {
-            let matches = [...tnode.data.matchAll(re)];
+            let matches = [...tnode.data.matchAll(searchExpression)];
+            // Observed some that some text nodes have a null parentElement/parentNode
             if (matches.length > 0 && tnode.parentElement) {
-                let ranges = matches.map((result) => [result.index, result.index + result[0].length]);
+                let ranges = matches.map(
+                    (result) => [result.index, result.index + result[0].length]
+                );
                 let swappedElement = new HighlightReplacement(ranges, tnode);
                 this.ReplacedText.push(swappedElement);
                 swappedElement.Swap();
             }
         }
-        console.log(`Found ${this.ReplacedText.length} match(es).`);
     }
 
-    changeColor(options = DefaultHighlightOptions) {
+    ChangeHighlightColor(options = DefaultHighlightOptions) {
         this.colors = SafeConfigParse(DefaultHighlightOptions, options);
+        for (let matchedElement of this.ReplacedText) {
+            matchedElement.ChangeColor(this.colors);
+        }
     }
 }
 
@@ -202,12 +215,12 @@ function SearchEventHandler(message) {
     switch(message.command) {
         case "exec_search":
             console.log(`Starting search`);
-            searchInstance.revert();
-            searchInstance.search(message.searchString);
+            searchInstance.Revert();
+            searchInstance.Search(message.searchString);
             console.log(`Search finished`);
             break;
         case "change_color":
-            searchInstance.changeColor();
+            searchInstance.ChangeHighlightColor();
             break;
         default:
             break;
@@ -215,6 +228,4 @@ function SearchEventHandler(message) {
 }
 
 browser.runtime.onMessage.addListener(SearchEventHandler);
-
-console.log("re-search.js loaded");
 })();
