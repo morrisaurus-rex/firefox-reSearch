@@ -1,7 +1,7 @@
-(() => {
+import { Message, MessageType } from './message_protocol.js'
+import { DefaultHighlightOptions, HighlightReplacement } from './highlight_replacement.js';
 
-const NON_MATCH_CLASS = "re-search_non_matching";
-const MATCH_CLASS = "re-search_matching";
+(() => {
 
 const TAGNAME_EXCLUDE = {
     "SCRIPT": true,
@@ -67,72 +67,6 @@ function CreateTextElement(text) {
     return e;
 }
 
-const DefaultHighlightOptions = {
-    color: "white",
-    backgroundColor: "green",
-}
-/**
- * Helper function for {@link HighlightReplacement}. Creates an element holding slices of a given string, divided according to a sorted, two-dimensional array of index ranges.
- * @param {string} str 
- * @param {Array} segmentRanges Two-dimensional array of the form [[x, y],...]. Follows the same index semantics of {@link String.prototype.substring}.
- * @param {string} textColor Color string compatible with {@link CSSStyleDeclaration}.
- * @param {string} backgroundColor Color string compatible with {@link CSSStyleDeclaration}.
- * @returns Returns an element that may contain multiple text segments contained in their own <a> elements.
- */
-function SeperateString(str, segmentRanges, textColor = "", backgroundColor = "") {
-    let stringPointer = 0;
-    let container = document.createElement('span');
-    let rightBound = segmentRanges[segmentRanges.length - 1][1];
-
-    for (let pair of segmentRanges) {
-        let enc = CreateTextElement(str.substring(pair[0], pair[1]));
-        enc.style.color = textColor;
-        enc.style.backgroundColor = backgroundColor;
-        enc.className = MATCH_CLASS;
-        if (pair[0] > stringPointer) {
-            let nonmatch = CreateTextElement(str.substring(stringPointer, pair[0]));
-            nonmatch.className = NON_MATCH_CLASS;
-            container.appendChild(nonmatch);
-        }
-        stringPointer = pair[1];
-        container.appendChild(enc);
-    }
-    if (rightBound < str.length) {
-        container.appendChild(CreateTextElement(str.substring(rightBound, str.length)));
-    }
-    return container;
-}
-/**
- * For every Text node that has a match, we'll need to separate the matches into their own element so that we can apply highlightning. This needs to be a reversible process so our replacement will
- * be kept as one entity and carry a reference to the Text it just replaced.
- */
-class HighlightReplacement {
-    constructor(matchRanges = [[0, 0]], textnode = null, colorOptions = DefaultHighlightOptions) {
-        let text = (textnode)? textnode.data: "";
-        this.wrapper = SeperateString(text, matchRanges, colorOptions.color, colorOptions.backgroundColor);
-        this.swap = textnode;
-    }
-    /** Swaps the wrapper element with the Text node it originally replaced. This also reassigns all fields to null to avoid potential memory leaks. */
-    Unswap() {
-        this.wrapper.replaceWith(this.swap);
-        this.wrapper = null;
-        this.swap = null;
-    }
-    /** Swaps the Text node with the wrapper it is meant to replace. */
-    Swap() {
-        if (this.swap)
-            this.swap.parentElement.replaceChild(this.wrapper, this.swap);
-    }
-    /** Changes the highlight color scheme. */
-    ChangeColor(colorObj = DefaultHighlightOptions) {
-        for (let el of this.wrapper.children) {
-            if (el.className == MATCH_CLASS) {
-                el.style.color = colorObj.color;
-                el.style.backgroundColor = colorObj.backgroundColor
-            }
-        }
-    }
-}
 /**
  * This class should be the container for state information.
  */
@@ -202,6 +136,33 @@ class Searcher {
             matchedElement.ChangeColor(this.colors);
         }
     }
+    /**
+     * Function to scroll the matched element into view.
+     * @param {*} index 
+     * @returns 
+     */
+    JumpTo(index) {
+        if (this.ReplacedText.length == 0) return;
+        else {
+            this.ReplacedText[index].wrapper.scrollIntoView();
+        }
+    }
+    /**
+     * 
+     * @returns Number of regex matches.
+     */
+    GetNumMatches() {
+        return this.ReplacedText.length;
+    }
+    /**
+     * 
+     * @param {number} index The index of the desired match.
+     * @returns Returns null if index is invalid, otherwise returns a {@link HighlightReplacement}.
+     */
+    GetMatchInfo(index) {
+        if (index >= this.ReplacedText.length || index < 0) return null;
+        return this.ReplacedText[index];
+    }
 }
 
 let searchInstance = new Searcher(document.body);
@@ -213,15 +174,30 @@ let searchInstance = new Searcher(document.body);
 function SearchEventHandler(message) {
     if (!message) return;
     switch(message.command) {
-        case "exec_search":
-            console.log(`Starting search`);
+        case MessageType.SEARCH:
             searchInstance.Revert();
-            searchInstance.Search(message.searchString);
-            console.log(`Search finished`);
+            searchInstance.Search(message.params[0]);
+            let sentNumMessage = new Message(MessageType.SENT_NUM, null);
+            let sentMaxMessage = new Message(MessageType.SENT_MAX, [0]);
+            if (searchInstance.GetNumMatches() != 0) {
+                sentNumMessage.params = [0, searchInstance.GetMatchInfo(0)];
+                sentMaxMessage.params[0] = searchinstance.GetNumMatches();
+                browser.runtime.sendMessage(sentNumMessage);
+                browser.runtime.sendMessage(sentMaxMessage);
+            }
             break;
-        case "change_color":
-            searchInstance.ChangeHighlightColor();
+        case MessageType.CHANGE_COLOR:
+            searchInstance.ChangeHighlightColor(message.params[0]);
             break;
+        case MessageType.CLEAR:
+            searchInstance.Revert();
+            break;
+        case MessageType.JUMP_TO:
+            searchInstance.JumpTo(message.params[0]);
+            break;
+        case MessageType.GET_NUM:
+            let match = searchInstance.GetMatchInfo(message.params[0]);
+            browser.runtime.sendMessage(new Message(MessageType.SENT_NUM, [message.params[0], match]));
         default:
             break;
     }

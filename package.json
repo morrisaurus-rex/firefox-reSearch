@@ -1,0 +1,25 @@
+{
+  "name": "re-search-extension",
+  "version": "1.0.0",
+  "description": "Regex find functionality in a browser extension",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack && node ./copy.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bulma": "^0.9.4",
+    "svelte": "^4.2.0",
+    "typescript": "^5.1.6"
+  },
+  "devDependencies": {
+    "@tsconfig/svelte": "^5.0.0",
+    "html-webpack-plugin": "^5.5.3",
+    "svelte-loader": "^3.1.9",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
+  },
+  "type": "module"
+}
