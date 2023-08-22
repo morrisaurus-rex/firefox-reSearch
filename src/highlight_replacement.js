@@ -9,6 +9,18 @@ const NON_MATCH_CLASS = "re-search_non_matching";
 /** Class name for <a> elmenets containing matched text. */
 const MATCH_CLASS = "re-search_matching";
 
+/** 
+ * Utility function to make an inline element containing only our text.
+ * @param {string} text The text to appear in the created element.
+ * @returns An <a> element with the given text, set to display as an inline block.
+ */
+function CreateTextElement(text) {
+    let e = document.createElement('span');
+    let t = document.createTextNode(text);
+    e.appendChild(t);
+    return e;
+}
+
 /**
  * Helper function for {@link HighlightReplacement}. Creates an element holding slices of a given string, divided according to a sorted, two-dimensional array of index ranges.
  * @param {string} str 
@@ -52,6 +64,10 @@ export class HighlightReplacement {
         this.wrapper = SeparateString(text, matchRanges, colorOptions.color, colorOptions.backgroundColor);
         /**@type Node */
         this.swap = textnode;
+        this.matches = [];
+        for (let atag of this.wrapper.children) {
+            if (atag.className == MATCH_CLASS) this.matches.push(atag);
+        }
     }
     /** Swaps the wrapper element with the Text node it originally replaced. This also reassigns all fields to null to avoid potential memory leaks. */
     Unswap() {

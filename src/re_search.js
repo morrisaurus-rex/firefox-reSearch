@@ -8,6 +8,11 @@ const TAGNAME_EXCLUDE = {
     "STYLE": true,
 }
 
+const DefaultCurrentMatchColor = {
+    color: "Blue",
+    backgroundColor: "Yellow"
+}
+
 if (window.hasRun) return;
 window.hasRun = true;
 
@@ -55,32 +60,25 @@ function SafeConfigParse(defaultOptions, givenOptions) {
     return finalSettings;
 }
 
-/** 
- * Utility function to make an inline element containing only our text.
- * @param {string} text The text to appear in the created element.
- * @returns An <a> element with the given text, set to display as an inline block.
- */
-function CreateTextElement(text) {
-    let e = document.createElement('span');
-    let t = document.createTextNode(text);
-    e.appendChild(t);
-    return e;
-}
 
 /**
  * This class should be the container for state information.
  */
 class Searcher {
-    constructor(root = document.body, colorOptions = DefaultHighlightOptions) {
+    constructor(root = document.body, colorOptions = DefaultHighlightOptions, matchedColorOptions) {
         /** The first node to start searching from. */
         this.RootNode = root;
         /** List of all Text nodes present in the DOM body. */
         this.TextNodes = AggregateTextNodes(root);
         /** List of all {@link HighlightReplacement} created by the last search call. */
         this.ReplacedText = [];
-        this.colors = SafeConfigParse(DefaultHighlightOptions, colorOptions);
-
-        console.log(`Processed ${this.TextNodes.length} Text node(s)`);
+        /** List of individual <a> elements that contain matched text.
+         * @type Element[]
+        */
+        this.TrueMatchList = [];
+        this.Colors = SafeConfigParse(DefaultHighlightOptions, colorOptions);
+        this.CurrentMatchColors = SafeConfigParse(DefaultCurrentMatchColor, matchedColorOptions);
+        this.CurrentMatch = null;
         
     }
     UpdateRoot(newRoot) {
@@ -91,16 +89,20 @@ class Searcher {
      */
     Update() {
         this.Revert();
+        /**@type Node[] */
         this.TextNodes = AggregateTextNodes(this.RootNode);
     }
     /**
      * Call to restore the original document.
      */
     Revert() {
+        // Make sure we clear every field that might contain a reference to a DOM element
         for (let swapped of this.ReplacedText) {
             swapped.Unswap();
         }
         this.ReplacedText = [];
+        this.TrueMatchList = [];
+        this.CurrentMatch = null;
     }
     /**
      * Carry out a search of all strings within {@link TextNodes} and highlight matched text in the DOM.
@@ -125,26 +127,27 @@ class Searcher {
                 );
                 let swappedElement = new HighlightReplacement(ranges, tnode);
                 this.ReplacedText.push(swappedElement);
+                this.TrueMatchList = this.TrueMatchList.concat(swappedElement.matches);
                 swappedElement.Swap();
             }
         }
     }
 
     ChangeHighlightColor(options = DefaultHighlightOptions) {
-        this.colors = SafeConfigParse(DefaultHighlightOptions, options);
+        this.Colors = SafeConfigParse(DefaultHighlightOptions, options);
         for (let matchedElement of this.ReplacedText) {
-            matchedElement.ChangeColor(this.colors);
+            matchedElement.ChangeColor(this.Colors);
         }
     }
     /**
      * Function to scroll the matched element into view.
-     * @param {*} index 
-     * @returns 
+     * @param {number} index 
+     * @returns {void} 
      */
     JumpTo(index) {
         if (this.ReplacedText.length == 0) return;
         else {
-            this.ReplacedText[index].wrapper.scrollIntoView();
+            this.TrueMatchList[index].scrollIntoView();
         }
     }
     /**
@@ -152,7 +155,7 @@ class Searcher {
      * @returns Number of regex matches.
      */
     GetNumMatches() {
-        return this.ReplacedText.length;
+        return this.TrueMatchList.length;
     }
     /**
      * 
@@ -160,8 +163,31 @@ class Searcher {
      * @returns Returns null if index is invalid, otherwise returns a {@link HighlightReplacement}.
      */
     GetMatchInfo(index) {
-        if (index >= this.ReplacedText.length || index < 0) return null;
-        return this.ReplacedText[index];
+        if (index >= this.TrueMatchList.length || index < 0) return null;
+        this.SetCurrentMatch(index);
+        return this.TrueMatchList[index];
+    }
+    /**
+     * Sets a matched string as the "focused match", giving it a distinct highlight color.
+     * @param {number} index 
+     * @returns {void}
+     */
+    SetCurrentMatch(index) {
+        if (index >= this.TrueMatchList.length || index < 0) return;
+        this.CurrentMatch = this.TrueMatchList[index];
+        this.CurrentMatch.style.color = this.CurrentMatchColors.color;
+        this.CurrentMatch.style.backgroundColor = this.CurrentMatchColors.backgroundColor;
+    }
+    /**
+     * Clears the distinct highlight for a focused match.
+     * @param {number} index 
+     * @returns {void}
+     */
+    ClearCurrentMatch(index) {
+        if (index >= this.TrueMatchList.length || index < 0 || this.CurrentMatch == null) return;
+        this.CurrentMatch.style.color = this.Colors.color;
+        this.CurrentMatch.style.backgroundColor = this.Colors.backgroundColor;
+        this.CurrentMatch = null;
     }
 }
 
@@ -187,7 +213,7 @@ function SearchEventHandler(message) {
             }
             break;
         case MessageType.CHANGE_COLOR:
-            searchInstance.ChangeHighlightColor(message.params[0]);
+            searchInstance.ChangeHighlightColor(SafeConfigParse(DefaultHighlightOptions, message.params[0]));
             break;
         case MessageType.CLEAR:
             searchInstance.Revert();
@@ -197,7 +223,14 @@ function SearchEventHandler(message) {
             break;
         case MessageType.GET_NUM:
             let match = searchInstance.GetMatchInfo(message.params[0]);
-            browser.runtime.sendMessage(new Message(MessageType.SENT_NUM, [message.params[0], match]));
+            if (match) {
+                browser.runtime.sendMessage(new Message(MessageType.SENT_NUM, [message.params[0], match]));
+                searchInstance.SetCurrentMatch(message.params[0]);
+            }
+            break;
+        case MessageType.CLEAR_CURRENT:
+            searchInstance.ClearCurrentMatch();
+            break;
         default:
             break;
     }

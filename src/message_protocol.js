@@ -1,13 +1,23 @@
 
 export const MessageType = {
+    /** Execute a search. */
     "SEARCH": 1,
+    /** Have the content script tel lthe browser to jump to an element. */
     "JUMP_TO": 2,
+    /** Clear the current search result. */
     "CLEAR": 3,
+    /** Change the colors of the match highlight. */
     "CHANGE_COLOR": 4,
+    /** Get a match according to the given index parameter. */
     "GET_NUM": 5,
+    /** Signals the popup in response to a {@link GET_NUM} message. Also sets the match as a focused element. */
     "SENT_NUM": 6,
+    /** Get the total number of matches found. */
     "GET_MAX": 7,
-    "SENT_MAX": 8
+    /** Signals the popup in response to a {@link GET_MAX} message. */
+    "SENT_MAX": 8,
+    /** Clears the match currently set as focused. */
+    "CLEAR_CURRENT": 9
 };
 
 /**
