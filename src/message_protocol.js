@@ -35,7 +35,7 @@ function InvertEnumKeyValue(obj) {
 
 export class Message {
     constructor(msgtype, params) {
-        if (!MessageType.hasOwnKeys(msgtype)) throw new Error('Invalid message type');
+        if (!MessageTypeInverse.hasOwnProperty(msgtype)) throw new Error('Invalid message type');
         this.command = msgtype;
         this.params = params;
     }

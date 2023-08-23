@@ -49,6 +49,7 @@ function AggregateTextNodes(parentNode) {
  * @returns 
  */
 function SafeConfigParse(defaultOptions, givenOptions) {
+    if (!givenOptions) return structuredClone(defaultOptions);
     let finalSettings = {};
     for (let setting of Object.keys(defaultOptions)) {
         if (givenOptions.hasOwnProperty(setting)) {
@@ -160,12 +161,12 @@ class Searcher {
     /**
      * 
      * @param {number} index The index of the desired match.
-     * @returns Returns null if index is invalid, otherwise returns a {@link HighlightReplacement}.
+     * @returns Returns null if index is invalid, otherwise returns a string.
      */
     GetMatchInfo(index) {
         if (index >= this.TrueMatchList.length || index < 0) return null;
         this.SetCurrentMatch(index);
-        return this.TrueMatchList[index];
+        return this.TrueMatchList[index].textContent;
     }
     /**
      * Sets a matched string as the "focused match", giving it a distinct highlight color.
@@ -198,6 +199,7 @@ let searchInstance = new Searcher(document.body);
  * @param message 
  */
 function SearchEventHandler(message) {
+    debugger;
     if (!message) return;
     switch(message.command) {
         case MessageType.SEARCH:
@@ -207,7 +209,7 @@ function SearchEventHandler(message) {
             let sentMaxMessage = new Message(MessageType.SENT_MAX, [0]);
             if (searchInstance.GetNumMatches() != 0) {
                 sentNumMessage.params = [0, searchInstance.GetMatchInfo(0)];
-                sentMaxMessage.params[0] = searchinstance.GetNumMatches();
+                sentMaxMessage.params[0] = searchInstance.GetNumMatches();
                 browser.runtime.sendMessage(sentNumMessage);
                 browser.runtime.sendMessage(sentMaxMessage);
             }
@@ -235,6 +237,6 @@ function SearchEventHandler(message) {
             break;
     }
 }
-
+debugger;
 browser.runtime.onMessage.addListener(SearchEventHandler);
 })();
